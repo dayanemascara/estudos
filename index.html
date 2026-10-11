@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Estudos">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Meus estudos</title>
+<style>
+:root{--navy:#1F3864;--bg:#f4f6fa;--card:#fff;--line:#d9dee8;--text:#1d1d1f;--muted:#6b7280;--ok:#2e7d32;--bad:#c62828}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;font-family:-apple-system,system-ui,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:15px}
+header{background:var(--navy);color:#fff;padding:14px 16px;padding-top:calc(14px + env(safe-area-inset-top));font-weight:600;font-size:18px}
+nav{display:flex;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
+nav button{flex:1;padding:12px 4px;border:0;background:none;font-size:15px;color:var(--muted);border-bottom:3px solid transparent}
+nav button.on{color:var(--navy);border-bottom-color:var(--navy);font-weight:600}
+main{padding:14px;padding-bottom:calc(30px + env(safe-area-inset-bottom));max-width:720px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+h2{font-size:16px;margin:0 0 10px;color:var(--navy)}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+input,select{width:100%;font-size:16px;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text)}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+.row>button{flex:0 0 auto}
+.btn{background:var(--navy);color:#fff;border:0;border-radius:8px;padding:11px 14px;font-size:15px;margin-top:12px;cursor:pointer}
+.row .btn{margin-top:0}
+.sec{background:#e8ecf4;color:var(--navy)}
+.lnk{background:none;border:0;color:var(--navy);font-size:14px;padding:4px 6px;cursor:pointer}
+.lnk.red{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:8px}
+th,td{padding:8px 4px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:12px}
+.n{text-align:right;white-space:nowrap}
+.bar{height:8px;background:#e8ecf4;border-radius:4px;overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--navy)}
+.item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.grow{flex:1;min-width:0}
+.muted{color:var(--muted);font-size:13px}
+.ok{color:var(--ok)}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center}
+.kpis b{display:block;font-size:20px;color:var(--navy)}
+.kpis span{font-size:12px;color:var(--muted)}
+details{border-top:1px solid var(--line);padding:4px 0}
+summary{cursor:pointer;padding:8px 0;font-weight:600}
+.tools{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 8px}
+.msg{color:var(--ok);font-size:14px;margin:8px 0 0}
+</style>
+</head>
+<body>
+<header>Meus estudos</header>
+<nav>
+  <button data-tab="reg" class="on">Registro</button>
+  <button data-tab="pai">Painel</button>
+  <button data-tab="cad">Cadastros</button>
+</nav>
+<main>
+  <section id="reg"></section>
+  <section id="pai" hidden></section>
+  <section id="cad" hidden></section>
+</main>
+<script>
+const KEY = "meus-estudos-v1";
+const hoje = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtData = s => s ? s.split("-").reverse().join("/") : "";
+const pct = (a, q) => q ? Math.round(a / q * 100) + "%" : "n/d";
+const horas = m => (m / 60).toFixed(1) + " h";
+let S;
+
+function load() {
+  try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
+  if (!S || !["disciplinas", "assuntos", "metodos", "registros"].every(k => Array.isArray(S[k]))) {
+    S = { disciplinas: [], assuntos: [], metodos: ["Teoria", "Lei seca", "Mapeamento", "Questões", "Revisão"].map(n => ({ id: uid(), nome: n })), registros: [] };
+    save();
+  }
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); }
+  catch (e) { alert("Não foi possível salvar neste aparelho. Exporte um backup."); }
+}
+const ativos = l => l.filter(x => !x.arquivado);
+const assDe = id => S.assuntos.filter(a => a.disciplinaId === id && !a.arquivado);
+const nomeDe = (lista, id) => (lista.find(x => x.id === id) || {}).nome || "(sem nome)";
+const colecao = { disc: () => S.disciplinas, ass: () => S.assuntos, met: () => S.metodos };
+const achar = (t, id) => colecao[t]().find(x => x.id === id);
+const opts = (lista, vazio, sel) => `<option value="">${esc(vazio)}</option>` + lista.map(x => `<option value="${x.id}"${x.id === sel ? " selected" : ""}>${esc(x.nome)}</option>`).join("");
+function sumIf(f) {
+  const rs = S.registros.filter(f);
+  return {
+    min: rs.reduce((s, r) => s + r.minutos, 0),
+    q: rs.reduce((s, r) => s + r.questoes, 0),
+    a: rs.reduce((s, r) => s + r.acertos, 0),
+  };
+}
+
+/* ---------- Registro ---------- */
+function formAtual() {
+  const f = document.getElementById("fReg");
+  if (!f) return {};
+  const v = Object.fromEntries(new FormData(f));
+  return { data: v.data, minutos: v.minutos, disciplinaId: v.disciplinaId, assuntoId: v.assuntoId, metodoId: v.metodoId, questoes: v.questoes, acertos: v.acertos };
+}
+function viewReg(d = {}, msg = "") {
+  const lista = [...S.registros].sort((a, b) => b.data.localeCompare(a.data)).slice(0, 25);
+  document.getElementById("reg").innerHTML = `
+  <div class="card"><h2>Novo registro</h2>
+  <form id="fReg">
+    <div class="row">
+      <div><label>Data</label><input type="date" name="data" value="${d.data || hoje()}" required></div>
+      <div><label>Minutos estudados</label><input type="number" name="minutos" min="0" step="1" value="${d.minutos ?? ""}" required></div>
+    </div>
+    <label>Disciplina</label>
+    <div class="row"><select name="disciplinaId" id="selDisc">${opts(ativos(S.disciplinas), "Escolha a disciplina", d.disciplinaId)}</select><button type="button" class="btn sec" data-novo="disc">+</button></div>
+    <label>Assunto</label>
+    <div class="row"><select name="assuntoId" id="selAss">${opts(d.disciplinaId ? assDe(d.disciplinaId) : [], "Escolha o assunto", d.assuntoId)}</select><button type="button" class="btn sec" data-novo="ass">+</button></div>
+    <label>Método</label>
+    <div class="row"><select name="metodoId">${opts(ativos(S.metodos), "Escolha o método", d.metodoId)}</select><button type="button" class="btn sec" data-novo="met">+</button></div>
+    <div class="row">
+      <div><label>Questões resolvidas</label><input type="number" name="questoes" min="0" value="${d.questoes ?? 0}"></div>
+      <div><label>Questões acertadas</label><input type="number" name="acertos" min="0" value="${d.acertos ?? 0}"></div>
+    </div>
+    <button class="btn" type="submit">Salvar registro</button>
+    ${msg ? `<p class="msg">${msg}</p>` : ""}
+  </form></div>
+  <div class="card"><h2>Últimos registros</h2>
+  ${lista.length ? lista.map(r => `<div class="item"><div class="grow">
+      <b>${fmtData(r.data)}</b> · ${esc(nomeDe(S.disciplinas, r.disciplinaId))}<br>
+      <span class="muted">${esc(nomeDe(S.assuntos, r.assuntoId))} · ${esc(nomeDe(S.metodos, r.metodoId))} · ${r.minutos} min · ${r.questoes} questões · ${r.acertos} acertos</span>
+    </div><button class="lnk red" data-del="${r.id}">Excluir</button></div>`).join("") : '<p class="muted">Nenhum registro ainda.</p>'}
+  </div>`;
+}
+function novoRapido(tipo) {
+  const d = formAtual();
+  if (tipo === "ass" && !d.disciplinaId) { alert("Escolha a disciplina antes."); return; }
+  const rotulo = { disc: "Nome da disciplina:", ass: "Nome do assunto:", met: "Nome do método:" }[tipo];
+  const nome = (prompt(rotulo) || "").trim();
+  if (!nome) return;
+  const item = { id: uid(), nome };
+  if (tipo === "disc") { S.disciplinas.push(item); d.disciplinaId = item.id; d.assuntoId = ""; }
+  if (tipo === "ass") { Object.assign(item, { disciplinaId: d.disciplinaId, concluido: false, dataConclusao: null }); S.assuntos.push(item); d.assuntoId = item.id; }
+  if (tipo === "met") { S.metodos.push(item); d.metodoId = item.id; }
+  save();
+  viewReg(d);
+}
+
+/* ---------- Painel ---------- */
+function viewPainel() {
+  const t = sumIf(() => true);
+  const discs = S.disciplinas.filter(d => !d.arquivado || S.registros.some(r => r.disciplinaId === d.id));
+  const linhas = discs.map(d => {
+    const s = sumIf(r => r.disciplinaId === d.id);
+    const ass = S.assuntos.filter(a => a.disciplinaId === d.id && (!a.arquivado || S.registros.some(r => r.assuntoId === a.id)));
+    const vivos = ass.filter(a => !a.arquivado);
+    const conc = vivos.filter(a => a.concluido).length;
+    const pr = vivos.length ? Math.round(conc / vivos.length * 100) : 0;
+    return { d, s, ass, conc, pr, total: vivos.length };
+  });
+  const tab1 = linhas.length ? `<table><tr><th>Disciplina</th><th class="n">Horas</th><th class="n">Questões</th><th class="n">Acerto</th><th>Progresso</th></tr>
+    ${linhas.map(l => `<tr><td>${esc(l.d.nome)}${l.d.arquivado ? ' <span class="muted">(arquivada)</span>' : ""}</td><td class="n">${horas(l.s.min)}</td><td class="n">${l.s.q}</td><td class="n">${pct(l.s.a, l.s.q)}</td>
+    <td style="min-width:90px">${l.conc}/${l.total} (${l.pr}%)<div class="bar"><i style="width:${l.pr}%"></i></div></td></tr>`).join("")}</table>`
+    : '<p class="muted">Cadastre disciplinas para ver o progresso.</p>';
+  const detalhes = linhas.map(l => `<details><summary>${esc(l.d.nome)}</summary>
+    ${l.ass.length ? `<table><tr><th>Assunto</th><th class="n">Horas</th><th class="n">Questões</th><th class="n">Acerto</th><th>Status</th></tr>
+    ${l.ass.map(a => { const s2 = sumIf(r => r.assuntoId === a.id); return `<tr><td>${esc(a.nome)}${a.arquivado ? ' <span class="muted">(arquivado)</span>' : ""}</td><td class="n">${horas(s2.min)}</td><td class="n">${s2.q}</td><td class="n">${pct(s2.a, s2.q)}</td><td>${a.concluido ? '<span class="ok">Concluído</span>' : '<span class="muted">Em aberto</span>'}</td></tr>`; }).join("")}</table>`
+    : '<p class="muted">Sem assuntos.</p>'}
+    </details>`).join("");
+  const mets = S.metodos.filter(m => !m.arquivado || S.registros.some(r => r.metodoId === m.id));
+  const tab2 = `<table><tr><th>Método</th><th class="n">Horas</th><th class="n">Questões</th><th class="n">Acerto</th></tr>
+    ${mets.map(m => { const s = sumIf(r => r.metodoId === m.id); return `<tr><td>${esc(m.nome)}</td><td class="n">${horas(s.min)}</td><td class="n">${s.q}</td><td class="n">${pct(s.a, s.q)}</td></tr>`; }).join("")}</table>`;
+  document.getElementById("pai").innerHTML = `
+  <div class="card"><h2>Total</h2>
+    <div class="kpis"><div><b>${horas(t.min)}</b><span>estudo</span></div><div><b>${t.q}</b><span>questões</span></div><div><b>${pct(t.a, t.q)}</b><span>acerto</span></div></div>
+  </div>
+  <div class="card"><h2>Por disciplina</h2>${tab1}</div>
+  <div class="card"><h2>Assuntos</h2>${detalhes || '<p class="muted">Nada para mostrar.</p>'}</div>
+  <div class="card"><h2>Por método</h2>${tab2}</div>`;
+}
+
+/* ---------- Cadastros ---------- */
+function viewCad() {
+  const sec = document.getElementById("cad");
+  const abertos = new Set([...sec.querySelectorAll("details[open]")].map(x => x.dataset.key));
+  const blocos = S.disciplinas.map(d => {
+    const key = "d" + d.id;
+    const ass = S.assuntos.filter(a => a.disciplinaId === d.id);
+    return `<details data-key="${key}"${abertos.has(key) ? " open" : ""}>
+      <summary>${esc(d.nome)}${d.arquivado ? ' <span class="muted">(arquivada)</span>' : ""}</summary>
+      <div class="tools">
+        <button class="lnk" data-ren data-tipo="disc" data-id="${d.id}">Renomear</button>
+        <button class="lnk" data-arq data-tipo="disc" data-id="${d.id}">${d.arquivado ? "Reativar" : "Arquivar"}</button>
+      </div>
+      ${ass.map(a => `<div class="item">
+        <input type="checkbox" data-conc="${a.id}"${a.concluido ? " checked" : ""} style="width:22px;height:22px;flex:0 0 auto">
+        <div class="grow">${esc(a.nome)}${a.concluido && a.dataConclusao ? ` <span class="muted">(${fmtData(a.dataConclusao)})</span>` : ""}${a.arquivado ? ' <span class="muted">(arquivado)</span>' : ""}</div>
+        <button class="lnk" data-ren data-tipo="ass" data-id="${a.id}">Editar</button>
+        <button class="lnk" data-arq data-tipo="ass" data-id="${a.id}">${a.arquivado ? "Reativar" : "Arquivar"}</button>
+      </div>`).join("") || '<p class="muted">Sem assuntos ainda.</p>'}
+      <div class="row" style="margin-top:10px"><input id="nass-${d.id}" placeholder="Novo assunto"><button class="btn sec" data-add="ass" data-id="${d.id}">Adicionar</button></div>
+    </details>`;
+  }).join("");
+  sec.innerHTML = `
+  <div class="card"><h2>Disciplinas e assuntos</h2>
+    <div class="row"><input id="ndisc" placeholder="Nova disciplina"><button class="btn sec" data-add="disc">Adicionar</button></div>
+    <div style="margin-top:8px">${blocos || '<p class="muted">Nenhuma disciplina ainda.</p>'}</div>
+  </div>
+  <div class="card"><h2>Métodos de estudo</h2>
+    ${S.metodos.map(m => `<div class="item"><div class="grow">${esc(m.nome)}${m.arquivado ? ' <span class="muted">(arquivado)</span>' : ""}</div>
+      <button class="lnk" data-ren data-tipo="met" data-id="${m.id}">Renomear</button>
+      <button class="lnk" data-arq data-tipo="met" data-id="${m.id}">${m.arquivado ? "Reativar" : "Arquivar"}</button></div>`).join("")}
+    <div class="row" style="margin-top:10px"><input id="nmet" placeholder="Novo método"><button class="btn sec" data-add="met">Adicionar</button></div>
+  </div>
+  <div class="card"><h2>Backup</h2>
+    <p class="muted">Os dados ficam só neste aparelho. Exporte um backup de tempos em tempos e guarde o arquivo no Arquivos ou no iCloud Drive.</p>
+    <div class="tools">
+      <button class="btn" data-exp>Exportar backup</button>
+      <label class="btn sec" style="cursor:pointer">Importar backup<input id="importar" type="file" accept=".json,application/json" hidden></label>
+    </div>
+  </div>`;
+}
+function addCad(btn) {
+  const tipo = btn.dataset.add;
+  const input = document.getElementById(tipo === "disc" ? "ndisc" : tipo === "met" ? "nmet" : "nass-" + btn.dataset.id);
+  const nome = input.value.trim();
+  if (!nome) return;
+  if (tipo === "disc") S.disciplinas.push({ id: uid(), nome });
+  if (tipo === "met") S.metodos.push({ id: uid(), nome });
+  if (tipo === "ass") S.assuntos.push({ id: uid(), disciplinaId: btn.dataset.id, nome, concluido: false, dataConclusao: null });
+  save(); refresh();
+}
+
+/* ---------- Backup ---------- */
+function exportar() {
+  const blob = new Blob([JSON.stringify(S, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "estudos-" + hoje() + ".json";
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+function importar(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let novo = null;
+    try { novo = JSON.parse(reader.result); } catch (e) { novo = null; }
+    const ok = novo && ["disciplinas", "assuntos", "metodos", "registros"].every(k => Array.isArray(novo[k]));
+    if (!ok) { alert("Arquivo de backup inválido."); return; }
+    if (!confirm("Substituir os dados deste aparelho pelo backup?")) return;
+    S = novo; save(); refresh();
+    alert("Backup importado.");
+  };
+  reader.readAsText(file);
+}
+
+/* ---------- Navegação e eventos ---------- */
+function refresh() { viewCad(); viewPainel(); }
+function showTab(n) {
+  ["reg", "pai", "cad"].forEach(s => document.getElementById(s).hidden = s !== n);
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.tab === n));
+  if (n === "reg") viewReg();
+  if (n === "pai") viewPainel();
+  if (n === "cad") viewCad();
+}
+
+document.addEventListener("click", e => {
+  const t = e.target;
+  const el = s => t.closest(s);
+  if (el("[data-tab]")) return showTab(el("[data-tab]").dataset.tab);
+  if (el("[data-novo]")) return novoRapido(el("[data-novo]").dataset.novo);
+  if (el("[data-add]")) return addCad(el("[data-add]"));
+  if (el("[data-exp]")) return exportar();
+  const del = el("[data-del]");
+  if (del) {
+    if (confirm("Excluir este registro?")) {
+      S.registros = S.registros.filter(r => r.id !== del.dataset.del);
+      save(); viewReg(formAtual()); viewPainel();
+    }
+    return;
+  }
+  const arq = el("[data-arq]");
+  if (arq) {
+    const item = achar(arq.dataset.tipo, arq.dataset.id);
+    if (item) { item.arquivado = !item.arquivado; save(); refresh(); }
+    return;
+  }
+  const ren = el("[data-ren]");
+  if (ren) {
+    const item = achar(ren.dataset.tipo, ren.dataset.id);
+    const n = (prompt("Novo nome:", item ? item.nome : "") || "").trim();
+    if (item && n) { item.nome = n; save(); refresh(); }
+    return;
+  }
+});
+
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.id === "selDisc") { document.getElementById("selAss").innerHTML = opts(assDe(t.value), "Escolha o assunto"); return; }
+  if (t.dataset.conc) {
+    const a = S.assuntos.find(x => x.id === t.dataset.conc);
+    if (a) { a.concluido = t.checked; a.dataConclusao = t.checked ? hoje() : null; save(); refresh(); }
+    return;
+  }
+  if (t.id === "importar") importar(t.files[0]);
+});
+
+document.addEventListener("submit", e => {
+  if (e.target.id !== "fReg") return;
+  e.preventDefault();
+  const v = formAtual();
+  const r = {
+    id: uid(), data: v.data, disciplinaId: v.disciplinaId, assuntoId: v.assuntoId, metodoId: v.metodoId,
+    minutos: Number(v.minutos) || 0, questoes: Number(v.questoes) || 0, acertos: Number(v.acertos) || 0,
+  };
+  if (!r.disciplinaId || !r.assuntoId || !r.metodoId) { alert("Escolha disciplina, assunto e método."); return; }
+  if (r.acertos > r.questoes) { alert("Acertos não podem ser maiores que o número de questões."); return; }
+  S.registros.push(r); save();
+  viewReg({ data: r.data, disciplinaId: r.disciplinaId, metodoId: r.metodoId }, "Registro salvo.");
+  viewPainel();
+});
+
+load();
+showTab("reg");
+</script>
+</body>
+</html>
